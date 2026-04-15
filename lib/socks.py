@@ -1,11 +1,39 @@
 import socket
 
+
+class DirectUDPClient:
+    """Drop-in replacement for SOCKS5Client that sends UDP directly."""
+
+    def __init__(self, timeout=5):
+        self.sd = None
+        self.timeout = timeout
+
+    def connect(self):
+        self.sd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.sd.settimeout(self.timeout)
+
+    def close(self):
+        if self.sd:
+            self.sd.close()
+
+    def send(self, data, destination):
+        self.sd.sendto(data, destination)
+
+    def recv(self, size):
+        try:
+            data, _ = self.sd.recvfrom(size)
+            return data
+        except socket.timeout:
+            raise SOCKS5ClientException(f"No response from target (timed out after {self.timeout}s)")
+
+
 class SOCKS5Client:
-    def __init__(self, proxy_host, proxy_port):
+    def __init__(self, proxy_host, proxy_port, timeout=5):
         self.proxy_host = proxy_host
         self.proxy_port = proxy_port
+        self.timeout = timeout
         self.proxy_sd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
-        
+
         # Need a port that the relay allows connections from when forwarding UDP
         self.relay_src_port = 0x1234
         
@@ -62,6 +90,7 @@ class SOCKS5Client:
     def send(self, data, destination):
         # We need a new connection (the existing TCP connection needs to stay open for the relay to also stay open)
         self.relay_sd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.relay_sd.settimeout(self.timeout)
         self.relay_sd.bind(('', self.relay_src_port))
         self.relay_sd.connect((self.proxy_host, self.relay_dst_port))
         
@@ -71,8 +100,11 @@ class SOCKS5Client:
         self.relay_sd.send(relay_header + data)
         
     def recv(self, size):
-        data = self.relay_sd.recv(size)
-        
+        try:
+            data = self.relay_sd.recv(size)
+        except socket.timeout:
+            raise SOCKS5ClientException(f"No response from target (timed out after {self.timeout}s)")
+
         if len(data) < 11:
             raise SOCKS5ClientException("Received packet is too small")
         
