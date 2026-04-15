@@ -1,18 +1,35 @@
 ## Overview
 
-This is a tool used to exploit CRED-1 over a SOCKS5 connection (with UDP support).
+This is a tool used to exploit CRED-1. It supports direct UDP connections or tunneling over a SOCKS5 proxy with UDP support.
 
 ## Installation
+
+Using [uv](https://docs.astral.sh/uv/) (recommended):
+
+```
+uv sync
+uv run main.py <target> <src_ip> [options]
+```
+
+Alternatively, with pip:
 
 ```
 python3 -m venv env
 source ./env/bin/activate
-pip install -r requirements.txt
+pip install .
 ```
 
 ## Usage
 
-To use Cred1Py:
+### Direct UDP (no proxy required)
+
+If you have a routed path to the target (e.g. via VPN, ligolo, NAT64):
+
+```
+uv run main.py <target> <src_ip>
+```
+
+### Via SOCKS5 proxy
 
 Start a SOCKS5 proxy via your C2, for example, CS uses the command:
 
@@ -20,10 +37,23 @@ Start a SOCKS5 proxy via your C2, for example, CS uses the command:
 > socks 9090 socks5 enableNoAuth a b
 ```
 
-Then we can invoke Cred1py with:
+Then invoke Cred1py with:
 
 ```
-python ./main.py <target> <src_ip> <socks_host> <socks_port>
+uv run main.py <target> <src_ip> --socks-host <socks_host> --socks-port <socks_port>
+```
+
+### Options
+
+```
+positional arguments:
+  target              SCCM PXE server IP
+  src_ip              IP address of the compromised host running the implant
+
+optional arguments:
+  --socks-host HOST   SOCKS5 proxy host (omit for direct UDP)
+  --socks-port PORT   SOCKS5 proxy port
+  --timeout SECONDS   UDP receive timeout in seconds (default: 5)
 ```
 
 Where:
@@ -65,13 +95,13 @@ Further information on this attack can be found in [Misconfiguration Manager](ht
 
 ## How Cred1Py Works
 
-Cred1Py attempts to perform this flow over a SOCKS5 connection, due to UDP support being provided as part of the SOCKS5 specification and included in products such as Cobalt Strike.
+Cred1Py can perform this flow either directly over UDP (when the target is IP-reachable) or over a SOCKS5 connection, due to UDP support being provided as part of the SOCKS5 specification and included in products such as Cobalt Strike.
 
 There are a few differences to the Cred1py implementation to tools like PxeThiefy as SOCKS5 limits our ability to retrieve TFTP files (we can't determine the source port used during the data transfer and therefore can't download more than a handful of bytes).
 
 This means that the requirements for Cred1Py are:
 
-1. An implant executing with SOCKS5 enabled
+1. A routed path to the target (direct UDP), or an implant executing with SOCKS5 enabled
 2. Ability to make a SMB connection to a distribution server (this replaces the TFTP component of PxeThiefy)
 
 Once the requirements are met, Cred1Py:

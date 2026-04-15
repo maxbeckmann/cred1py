@@ -1,0 +1,9 @@
+[project]
+name = "cred1py"
+version = "0.1.0"
+description = "SCCM CRED-1 exploitation tool"
+requires-python = ">=3.10"
+dependencies = [
+    "pycryptodome>=3.21.0",
+    "scapy>=2.6.0",
+]
